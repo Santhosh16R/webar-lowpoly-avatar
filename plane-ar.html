@@ -4,8 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Plane Tracking WebAR - Low-Poly Avatar</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
   <style>
     body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; }
+    body.in-ar { background: transparent; }
+    #ar-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
     #ui-overlay {
       position: fixed; top: 16px; left: 16px; right: 16px; z-index: 10;
       display: flex; justify-content: space-between; align-items: center; pointer-events: none;
@@ -19,19 +29,34 @@
       position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       background: rgba(0, 0, 0, 0.75); color: white; padding: 10px 20px;
       border-radius: 99px; font-size: 14px; pointer-events: none; z-index: 10;
-      text-align: center; white-space: nowrap;
+      text-align: center; width: max-content; max-width: calc(100vw - 32px);
     }
   </style>
 </head>
 <body>
+  <div id="ar-overlay">
   <div id="ui-overlay">
     <a href="./index.html" class="btn-ui">⬅ Back</a>
     <button id="replay-btn" class="btn-ui">🔄 Replay Animation</button>
   </div>
-  <div id="instructions">Tap "START AR" below, scan a table/floor, and tap to spawn!</div>
+  <div id="instructions" role="status" aria-live="polite">Loading 3D preview...</div>
+  </div>
+
+  <script>
+    // This runs before module loading so dependency failures are visible too.
+    const showError = (message) => {
+      document.getElementById('instructions').textContent = message;
+    };
+    window.addEventListener('error', (event) => {
+      showError('Could not load the 3D view. Check your connection and reload. ' + (event.message || ''));
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      showError('AR could not start. Check camera permission and try again. ' + (event.reason?.message || ''));
+    });
+  </script>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import * as THREE from 'three';
     import { ARButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/ARButton.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
     import { AvatarController } from './avatar.js';
@@ -81,25 +106,49 @@
     scene.add(reticle);
 
     // Add WebXR AR Button
-    const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
+    const arButton = ARButton.createButton(renderer, {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.getElementById('ar-overlay') }
+    });
     document.body.appendChild(arButton);
+
+    instructions.textContent = '3D preview ready. Tap START AR, scan a table or floor, then tap the blue ring.';
+    if (!navigator.xr) {
+      instructions.textContent = '3D preview only. Surface AR needs a WebXR-capable device and browser.';
+    } else {
+      navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        if (!supported) {
+          instructions.textContent = '3D preview only. Surface AR is unavailable on this device. Check Google Play Services for AR and Chrome updates.';
+        }
+      }).catch(() => {
+        instructions.textContent = '3D preview ready. AR support could not be checked. Try reloading in Chrome.';
+      });
+    }
 
     let hitTestSource = null;
     let hitTestSourceRequested = false;
 
     renderer.xr.addEventListener('sessionstart', () => {
+      document.body.classList.add('in-ar');
+      controls.enabled = false;
       previewGrid.visible = false;
       anchorGroup.visible = false; // Hide until user taps a detected surface
       instructions.textContent = 'Move phone slowly to detect a surface...';
     });
 
     renderer.xr.addEventListener('sessionend', () => {
+      document.body.classList.remove('in-ar');
+      controls.enabled = true;
+      hitTestSource?.cancel();
       hitTestSourceRequested = false;
       hitTestSource = null;
       reticle.visible = false;
       previewGrid.visible = true;
       anchorGroup.position.set(0, 0, 0);
+      anchorGroup.quaternion.identity();
       anchorGroup.visible = true;
+      instructions.textContent = '3D preview ready. Tap START AR to scan another surface.';
       avatar.playSequence();
     });
 
@@ -117,6 +166,7 @@
     scene.add(controller);
 
     replayBtn.addEventListener('click', () => {
+      if (renderer.xr.isPresenting && !anchorGroup.visible) return;
       anchorGroup.visible = true;
       avatar.playSequence();
     });
@@ -124,7 +174,7 @@
     const clock = new THREE.Clock();
 
     renderer.setAnimationLoop((timestamp, frame) => {
-      const dt = clock.getDelta();
+      const dt = Math.min(clock.getDelta(), 0.05);
       avatar.update(dt);
 
       if (frame) {
@@ -132,21 +182,31 @@
         const session = renderer.xr.getSession();
 
         if (!hitTestSourceRequested) {
-          session.requestReferenceSpace('viewer').then((viewerSpace) => {
-            session.requestHitTestSource({ space: viewerSpace }).then((source) => {
-              hitTestSource = source;
-            });
-          });
           hitTestSourceRequested = true;
+          session.requestReferenceSpace('viewer')
+            .then((viewerSpace) => session.requestHitTestSource({ space: viewerSpace }))
+            .then((source) => {
+              if (renderer.xr.getSession() === session) {
+                hitTestSource = source;
+              } else {
+                source?.cancel();
+              }
+            })
+            .catch(() => {
+              if (renderer.xr.getSession() === session) {
+                instructions.textContent = 'Surface detection failed. Exit AR and try again.';
+              }
+            });
         }
 
         if (hitTestSource) {
           const hitTestResults = frame.getHitTestResults(hitTestSource);
           if (hitTestResults.length > 0) {
             const hit = hitTestResults[0];
-            reticle.visible = true;
-            reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-            if (!anchorGroup.visible) {
+            const pose = hit.getPose(referenceSpace);
+            reticle.visible = Boolean(pose);
+            if (pose) reticle.matrix.fromArray(pose.transform.matrix);
+            if (pose && !anchorGroup.visible) {
               instructions.textContent = 'Surface found! Tap screen to spawn avatar.';
             }
           } else {

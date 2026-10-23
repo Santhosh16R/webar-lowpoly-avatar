@@ -1,6 +1,12 @@
 # Project analysis
 
-Reviewed on 2026-10-23. This review preserves the application source as supplied.
+Reviewed on 2026-10-23. The findings below describe the original imported source.
+
+## Plane page remediation
+
+The subsequent plane-page fix adds the missing Three.js import map, a transparent immersive AR background, a DOM overlay, load/support/error messages, and session-state cleanup. Preview controls are suspended during AR and replay no longer reveals an unplaced avatar. Hit-test failures and stale asynchronous results are handled.
+
+Validation: a mobile-sized headless Chromium session loaded the real CDN dependencies without JavaScript errors; a screenshot showed the avatar and grid. A simulated unsupported XR device displayed the intended fallback guidance. Physical Android camera passthrough and surface detection still require device testing. The image target and optional GLB findings remain unresolved.
 
 ## Architecture
 
