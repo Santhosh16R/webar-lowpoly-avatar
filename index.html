@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Avatar WebAR</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      background: #0f172a; color: #f8fafc;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px; text-align: center;
+    }
+    .card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+      padding: 32px 24px; max-width: 440px; width: 100%;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; color: #38bdf8; }
+    p { font-size: 0.95rem; color: #94a3b8; margin-bottom: 24px; line-height: 1.5; }
+    .btn {
+      display: block; width: 100%; padding: 14px 20px; margin-bottom: 14px;
+      border-radius: 10px; font-size: 1rem; font-weight: 600; text-decoration: none;
+      transition: transform 0.15s, background 0.2s;
+    }
+    .btn-primary { background: #0284c7; color: white; }
+    .btn-primary:hover { background: #0369a1; transform: translateY(-2px); }
+    .btn-secondary { background: #4f46e5; color: white; }
+    .btn-secondary:hover { background: #4338ca; transform: translateY(-2px); }
+    .badge {
+      display: inline-block; font-size: 0.75rem; background: #334155;
+      color: #cbd5e1; padding: 4px 10px; border-radius: 99px; margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Low-Poly Avatar WebAR</h1>
+    <p>Select your tracking mode below. The miniature avatar will spawn, run forward along the surface, turn, and wave.</p>
+    
+    <a href="./plane-ar.html" class="btn btn-primary">
+      🌐 Launch Plane Tracking AR
+    </a>
+    
+    <a href="./image-ar.html" class="btn btn-secondary">
+      🖼️ Launch Image Tracking AR
+    </a>
+
+    <span class="badge">Requires HTTPS / GitHub Pages & Camera Permission</span>
+  </div>
+</body>
+</html>

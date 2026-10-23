@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Image Tracking WebAR - Low-Poly Avatar</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
+  <style>
+    body { margin: 0; overflow: hidden; width: 100vw; height: 100vh; font-family: sans-serif; }
+    #container { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+    #ui-bar {
+      position: fixed; top: 16px; left: 16px; right: 16px; z-index: 20;
+      display: flex; justify-content: space-between;
+    }
+    .btn-ui {
+      background: rgba(15, 23, 42, 0.85); color: #fff; border: 1px solid #334155;
+      padding: 10px 16px; border-radius: 8px; text-decoration: none; font-size: 14px; cursor: pointer;
+    }
+    #hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); color: #fff; padding: 10px 18px;
+      border-radius: 99px; font-size: 14px; z-index: 20; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui-bar">
+    <a href="./index.html" class="btn-ui">⬅ Back</a>
+    <button id="replay-btn" class="btn-ui">🔄 Replay</button>
+  </div>
+  <div id="hint">Point camera at your target image</div>
+  <div id="container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-image-three';
+    import { AvatarController } from './avatar.js';
+
+    const hint = document.getElementById('hint');
+    const replayBtn = document.getElementById('replay-btn');
+
+    // By default, uses MindAR's sample card target so you can test immediately.
+    // Replace with './assets/targets.mind' once you compile your own image target!
+    const mindarThree = new MindARThree({
+      container: document.querySelector('#container'),
+      imageTargetSrc: 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/examples/image-tracking/assets/card-example/card.mind',
+    });
+
+    const { renderer, scene, camera } = mindarThree;
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.8);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight.position.set(1, 2, 2);
+    scene.add(dirLight);
+
+    const anchor = mindarThree.addAnchor(0);
+
+    // Rotate parent group so the avatar stands perpendicular/upright on a flat table card
+    const stageGroup = new THREE.Group();
+    stageGroup.rotation.x = Math.PI / 2;
+    anchor.group.add(stageGroup);
+
+    const avatar = new AvatarController(stageGroup, { useCustomGLB: false });
+
+    anchor.onTargetFound = () => {
+      hint.textContent = 'Target locked! Playing avatar sequence...';
+      avatar.playSequence();
+    };
+
+    anchor.onTargetLost = () => {
+      hint.textContent = 'Point camera at your target image';
+    };
+
+    replayBtn.addEventListener('click', () => {
+      avatar.playSequence();
+    });
+
+    const clock = new THREE.Clock();
+
+    const start = async () => {
+      await mindarThree.start();
+      renderer.setAnimationLoop(() => {
+        const dt = clock.getDelta();
+        avatar.update(dt);
+        renderer.render(scene, camera);
+      });
+    };
+
+    start();
+  </script>
+</body>
+</html>
